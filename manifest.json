@@ -1,0 +1,38 @@
+{
+  "manifest_version": 3,
+  "name": "LocalApply — 100% Local Job Application Autofill",
+  "version": "1.0.0",
+  "description": "Strictly local job application autofill & answer memory for Workday, Greenhouse, Ashby, Eightfold, Lever, and all career portals. Zero cloud servers.",
+  "permissions": [
+    "storage",
+    "unlimitedStorage",
+    "activeTab",
+    "scripting"
+  ],
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "LocalApply — Local Job Autofill"
+  },
+  "options_ui": {
+    "page": "dashboard/dashboard.html",
+    "open_in_tab": true
+  },
+  "background": {
+    "service_worker": "src/background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "src/storage.js",
+        "src/matcher.js",
+        "src/adapters.js",
+        "src/content.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": true
+    }
+  ]
+}

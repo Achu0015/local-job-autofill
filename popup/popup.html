@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>LocalApply — Local Autofill</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      width: 340px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f8fafc;
+      color: #0f172a;
+      font-size: 13px;
+    }
+    .header {
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      color: #fff;
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 700;
+      font-size: 15px;
+    }
+    .badge {
+      background: #10b981;
+      color: #fff;
+      padding: 2px 8px;
+      border-radius: 99px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .container {
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .card {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 10px 12px;
+    }
+    .section-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: #64748b;
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .cat-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+    .cat-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      color: #334155;
+      cursor: pointer;
+    }
+    .cat-item input {
+      accent-color: #10b981;
+      cursor: pointer;
+    }
+    .mode-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 12px;
+    }
+    .mode-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 6px;
+      cursor: pointer;
+      color: #334155;
+    }
+    .mode-item input {
+      margin-top: 2px;
+      accent-color: #10b981;
+    }
+    .btn-primary {
+      width: 100%;
+      background: #10b981;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .btn-primary:hover {
+      background: #059669;
+    }
+    .btn-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .btn-secondary {
+      background: #fff;
+      color: #1e293b;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: center;
+    }
+    .btn-secondary:hover {
+      background: #f1f5f9;
+    }
+    .stats-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: #475569;
+    }
+    .footer {
+      padding: 8px 16px 12px;
+      text-align: center;
+      font-size: 11px;
+      color: #64748b;
+    }
+    .status-msg {
+      background: #ecfdf5;
+      border: 1px solid #a7f3d0;
+      color: #065f46;
+      padding: 6px 10px;
+      border-radius: 7px;
+      font-size: 11px;
+      font-weight: 600;
+      text-align: center;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="brand">
+      <span>🔒</span>
+      <span>LocalApply</span>
+    </div>
+    <span class="badge" id="platform-badge">100% Local</span>
+  </div>
+
+  <div class="container">
+    <div id="status-msg" class="status-msg"></div>
+
+    <button class="btn-primary" id="btn-autofill">⚡ Autofill Selected Categories</button>
+
+    <div class="btn-row">
+      <button class="btn-secondary" id="btn-capture">💾 Save Answers on Page</button>
+      <button class="btn-secondary" id="btn-show-widget">🖥️ Field Picker Widget</button>
+    </div>
+
+    <div class="card">
+      <div class="section-title">
+        <span>Pick & Choose Categories</span>
+        <span>
+          <a href="#" id="cat-all" style="color:#0284c7;text-decoration:none;">All</a> ·
+          <a href="#" id="cat-none" style="color:#0284c7;text-decoration:none;">None</a>
+        </span>
+      </div>
+      <div class="cat-grid" id="cat-grid">
+        <label class="cat-item"><input type="checkbox" data-cat="profile" /> 👤 Profile/Contact</label>
+        <label class="cat-item"><input type="checkbox" data-cat="experience" /> 💼 Experience</label>
+        <label class="cat-item"><input type="checkbox" data-cat="education" /> 🎓 Education</label>
+        <label class="cat-item"><input type="checkbox" data-cat="workAuth" /> 🛂 Work Auth</label>
+        <label class="cat-item"><input type="checkbox" data-cat="eeo" /> ⚖️ EEO/Demo</label>
+        <label class="cat-item"><input type="checkbox" data-cat="customQA" /> 💬 Custom Q&A</label>
+        <label class="cat-item"><input type="checkbox" data-cat="files" /> 📎 Resume/PDF</label>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">
+        <span>Answer Capture Preference</span>
+      </div>
+      <div class="mode-list">
+        <label class="mode-item">
+          <input type="radio" name="captureMode" value="both" />
+          <span><b>Both (1 & 2):</b> Auto-detect as I fill + Manual Save button</span>
+        </label>
+        <label class="mode-item">
+          <input type="radio" name="captureMode" value="auto" />
+          <span><b>Option 1:</b> Auto-detect filled answers & prompt to save</span>
+        </label>
+        <label class="mode-item">
+          <input type="radio" name="captureMode" value="manual" />
+          <span><b>Option 2:</b> Only when clicking "Save Answers" button</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="stats-row">
+        <span id="stat-qa">Saved Q&As: 0</span>
+        <span id="stat-resume">Resume: None</span>
+      </div>
+    </div>
+
+    <button class="btn-secondary" id="btn-dashboard" style="width:100%;font-weight:700;border-color:#0f172a;">
+      ⚙️ Open Local Profile & Q&A Dashboard
+    </button>
+  </div>
+
+  <div class="footer">
+    🛡️ Stored strictly in <code>chrome.storage.local</code>
+  </div>
+
+  <script src="../src/storage.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

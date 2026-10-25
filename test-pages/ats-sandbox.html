@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LocalApply Multi-ATS Sandbox — Workday, Greenhouse, Ashby & Eightfold Simulator</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f8fafc;
+      color: #0f172a;
+      padding-bottom: 120px;
+    }
+    .banner {
+      background: #0f172a;
+      color: #fff;
+      padding: 16px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .banner h1 { font-size: 17px; }
+    .banner p { font-size: 12px; color: #94a3b8; }
+    .switcher {
+      max-width: 920px;
+      margin: 20px auto 0;
+      padding: 0 20px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .plat-btn {
+      padding: 9px 16px;
+      border-radius: 8px;
+      border: 1px solid #cbd5e1;
+      background: #fff;
+      font-weight: 700;
+      font-size: 13px;
+      cursor: pointer;
+      color: #334155;
+    }
+    .plat-btn.active {
+      background: #10b981;
+      color: #fff;
+      border-color: #10b981;
+    }
+    .form-container {
+      max-width: 920px;
+      margin: 16px auto;
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 14px;
+      padding: 28px;
+      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04);
+    }
+    .ats-header {
+      border-bottom: 1px solid #e2e8f0;
+      padding-bottom: 14px;
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .section-box {
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 16px;
+      margin-bottom: 18px;
+      background: #fcfcfd;
+    }
+    .section-box h3 {
+      font-size: 14px;
+      margin-bottom: 12px;
+      color: #1e293b;
+    }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      margin-bottom: 12px;
+    }
+    label, legend {
+      font-size: 12px;
+      font-weight: 600;
+      color: #334155;
+    }
+    input[type="text"],
+    input[type="email"],
+    input[type="tel"],
+    input[type="url"],
+    select,
+    textarea {
+      padding: 9px 11px;
+      border: 1px solid #cbd5e1;
+      border-radius: 7px;
+      font-size: 13px;
+      font-family: inherit;
+    }
+    .radio-row {
+      display: flex;
+      gap: 16px;
+      margin-top: 4px;
+    }
+    .radio-row label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    .file-upload-zone {
+      border: 2px dashed #94a3b8;
+      border-radius: 10px;
+      padding: 16px;
+      text-align: center;
+      background: #f8fafc;
+    }
+    .file-name {
+      margin-top: 6px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #059669;
+    }
+  </style>
+</head>
+<body data-ats-platform="Workday">
+  <div class="banner">
+    <div>
+      <h1>🧪 Multi-ATS Job Application Sandbox (Workday · Greenhouse · Ashby · Eightfold)</h1>
+      <p>Use the floating <b>LocalApply</b> widget in the bottom-right corner to test on-demand category/field selection, autofill, and answer learning!</p>
+    </div>
+    <div style="display:flex;gap:10px;">
+      <a href="../dashboard/dashboard.html" style="color:#34d399;font-size:13px;font-weight:700;text-decoration:none;">← Open Local Candidate Vault</a>
+    </div>
+  </div>
+
+  <div class="switcher">
+    <button class="plat-btn active" data-plat="Workday">Workday DOM (`data-automation-id`)</button>
+    <button class="plat-btn" data-plat="Greenhouse">Greenhouse DOM (`#grnhse_app`)</button>
+    <button class="plat-btn" data-plat="Ashby">Ashby DOM (`_systemfield_`)</button>
+    <button class="plat-btn" data-plat="Eightfold">Eightfold.ai DOM (`data-ef-id`)</button>
+  </div>
+
+  <div class="form-container" id="grnhse_app">
+    <div class="ats-header">
+      <div>
+        <h2 id="job-header-title">Senior Distributed Systems Engineer — Application</h2>
+        <p style="font-size:12px;color:#64748b;">Simulated ATS Form · Try unchecking categories or fields in the bottom-right widget, or typing a custom answer to save it!</p>
+      </div>
+      <button id="btn-clear-form" class="plat-btn" style="font-size:12px;padding:6px 12px;">Reset Form Fields</button>
+    </div>
+
+    <form id="application_form" onsubmit="event.preventDefault();">
+      <!-- 1. RESUME UPLOAD -->
+      <div class="section-box">
+        <h3>📎 Resume / CV Upload</h3>
+        <div class="file-upload-zone">
+          <label for="resume_upload">Upload Resume / CV (PDF, DOCX) *</label><br />
+          <input type="file" id="resume_upload" name="resume" data-automation-id="file-upload-input-ref" style="margin-top:8px;" />
+          <div class="file-name" data-file-status>No file chosen</div>
+        </div>
+      </div>
+
+      <!-- 2. CANDIDATE CONTACT & PROFILE -->
+      <div class="section-box">
+        <h3>👤 Candidate Information (Workday / Greenhouse / Ashby Selectors)</h3>
+        <div class="grid-2">
+          <div class="form-group">
+            <label for="wd_first_name">Legal First Name *</label>
+            <input type="text" id="wd_first_name" data-automation-id="legalNameSection_firstName" _systemfield_="first_name" />
+          </div>
+          <div class="form-group">
+            <label for="wd_last_name">Legal Last Name *</label>
+            <input type="text" id="wd_last_name" data-automation-id="legalNameSection_lastName" _systemfield_="last_name" />
+          </div>
+          <div class="form-group">
+            <label for="wd_email">Email Address *</label>
+            <input type="email" id="wd_email" data-automation-id="email" _systemfield_="email" />
+          </div>
+          <div class="form-group">
+            <label for="wd_phone">Phone Number *</label>
+            <input type="tel" id="wd_phone" data-automation-id="phone-number" _systemfield_="phone" />
+          </div>
+          <div class="form-group">
+            <label for="wd_address">Address Line 1</label>
+            <input type="text" id="wd_address" data-automation-id="addressSection_addressLine1" />
+          </div>
+          <div class="form-group">
+            <label for="wd_city">City</label>
+            <input type="text" id="wd_city" data-automation-id="addressSection_city" />
+          </div>
+          <div class="form-group">
+            <label for="wd_state">State / Province</label>
+            <select id="wd_state" data-automation-id="addressSection_countryRegion">
+              <option value="">-- Select State --</option>
+              <option value="CA">California</option>
+              <option value="NY">New York</option>
+              <option value="TX">Texas</option>
+              <option value="WA">Washington</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="wd_zip">Postal Code</label>
+            <input type="text" id="wd_zip" data-automation-id="addressSection_postalCode" />
+          </div>
+          <div class="form-group">
+            <label for="gh_linkedin">LinkedIn Profile URL</label>
+            <input type="url" id="gh_linkedin" name="job_application[linkedin]" />
+          </div>
+          <div class="form-group">
+            <label for="gh_github">GitHub URL</label>
+            <input type="url" id="gh_github" name="job_application[github]" />
+          </div>
+          <div class="form-group">
+            <label for="gh_portfolio">Portfolio / Personal Website</label>
+            <input type="url" id="gh_portfolio" name="job_application[website]" />
+          </div>
+          <div class="form-group">
+            <label for="gh_salary">What are your desired salary / compensation expectations?</label>
+            <input type="text" id="gh_salary" name="custom_salary" />
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. REPEATING WORK EXPERIENCE (WORKDAY / EIGHTFOLD STYLE) -->
+      <div class="section-box">
+        <h3>💼 Work Experience (Multi-Entry Repeater)</h3>
+        <div class="work-experience-item" data-automation-id="workExperience-1" style="border-bottom:1px dashed #cbd5e1;padding-bottom:12px;margin-bottom:12px;">
+          <div class="grid-2">
+            <div class="form-group">
+              <label>Job Title *</label>
+              <input type="text" name="exp_1_title" />
+            </div>
+            <div class="form-group">
+              <label>Company Name *</label>
+              <input type="text" name="exp_1_company" />
+            </div>
+            <div class="form-group">
+              <label>Start Date</label>
+              <input type="text" name="exp_1_start" />
+            </div>
+            <div class="form-group">
+              <label>End Date</label>
+              <input type="text" name="exp_1_end" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Role Description</label>
+            <textarea rows="2" name="exp_1_desc"></textarea>
+          </div>
+        </div>
+
+        <div class="work-experience-item" data-automation-id="workExperience-2">
+          <div class="grid-2">
+            <div class="form-group">
+              <label>Job Title</label>
+              <input type="text" name="exp_2_title" />
+            </div>
+            <div class="form-group">
+              <label>Company Name</label>
+              <input type="text" name="exp_2_company" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4. EDUCATION -->
+      <div class="section-box">
+        <h3>🎓 Education</h3>
+        <div class="education-item" data-automation-id="education-1">
+          <div class="grid-2">
+            <div class="form-group">
+              <label>School or University</label>
+              <input type="text" name="edu_1_school" />
+            </div>
+            <div class="form-group">
+              <label>Degree</label>
+              <select name="edu_1_degree">
+                <option value="">-- Select Degree --</option>
+                <option value="BS">Bachelor's Degree (B.S. / B.A.)</option>
+                <option value="MS">Master's Degree (M.S. / M.B.A.)</option>
+                <option value="PhD">Doctorate (Ph.D.)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Field of Study / Major</label>
+              <input type="text" name="edu_1_major" />
+            </div>
+            <div class="form-group">
+              <label>GPA</label>
+              <input type="text" name="edu_1_gpa" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5. WORK AUTHORIZATION & CUSTOM QUESTIONS -->
+      <div class="section-box">
+        <h3>🛂 Work Authorization & Custom Questions</h3>
+        <fieldset class="form-group" style="border:none;">
+          <legend>Are you legally authorized to work in the United States? *</legend>
+          <div class="radio-row">
+            <label><input type="radio" name="work_auth_us" value="Yes" /> Yes</label>
+            <label><input type="radio" name="work_auth_us" value="No" /> No</label>
+          </div>
+        </fieldset>
+
+        <fieldset class="form-group" style="border:none;">
+          <legend>Will you now or in the future require visa sponsorship for employment? *</legend>
+          <div class="radio-row">
+            <label><input type="radio" name="require_sponsor" value="Yes" /> Yes</label>
+            <label><input type="radio" name="require_sponsor" value="No" /> No</label>
+          </div>
+        </fieldset>
+
+        <div class="form-group">
+          <label for="custom_q_why">Why do you want to work at our company?</label>
+          <textarea id="custom_q_why" rows="2" placeholder="Saved Q&A Bank fuzzy matches this question..."></textarea>
+        </div>
+
+        <div class="form-group">
+          <label for="custom_q_new">What is your proudest technical project or system you built? (Try typing a new answer here and saving it in the widget!)</label>
+          <textarea id="custom_q_new" rows="2" placeholder="Type a custom answer here, then check the 'Save Answers' tab in the LocalApply widget..."></textarea>
+        </div>
+      </div>
+
+      <!-- 6. EEO / DEMOGRAPHICS -->
+      <div class="section-box">
+        <h3>⚖️ Voluntary Self-Identification (EEO)</h3>
+        <div class="grid-2">
+          <div class="form-group">
+            <label for="eeo_gender">Gender</label>
+            <select id="eeo_gender">
+              <option value="">-- Select --</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+              <option value="Non-binary">Non-binary</option>
+              <option value="Decline">Decline to self-identify</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="eeo_vet">Veteran Status</label>
+            <select id="eeo_vet">
+              <option value="">-- Select --</option>
+              <option value="Protected">I identify as one or more of the classifications of a protected veteran</option>
+              <option value="Not Protected">I am not a protected veteran</option>
+              <option value="Decline">I do not wish to answer</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="eeo_disability">Disability Status</label>
+            <select id="eeo_disability">
+              <option value="">-- Select --</option>
+              <option value="Yes">Yes, I have a disability</option>
+              <option value="No">No, I do not have a disability</option>
+              <option value="Decline">I do not wish to answer</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <script src="../src/storage.js"></script>
+  <script src="../src/matcher.js"></script>
+  <script src="../src/adapters.js"></script>
+  <script src="../src/content.js"></script>
+  <script>
+    // Platform switcher for testing detection
+    document.querySelectorAll('.plat-btn[data-plat]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.plat-btn[data-plat]').forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        const plat = btn.getAttribute('data-plat');
+        document.body.setAttribute('data-ats-platform', plat);
+        document.getElementById('job-header-title').textContent =
+          `Senior Distributed Systems Engineer — ${plat} Application`;
+        // Trigger rescan inside widget if mounted
+        const host = document.getElementById('localapply-host-root');
+        if (host && host.shadowRoot) {
+          const rescan = host.shadowRoot.getElementById('la-rescan-btn');
+          if (rescan) rescan.click();
+        }
+      });
+    });
+
+    document.getElementById('btn-clear-form').addEventListener('click', () => {
+      document.getElementById('application_form').reset();
+      document.querySelector('[data-file-status]').textContent = 'No file chosen';
+      const host = document.getElementById('localapply-host-root');
+      if (host && host.shadowRoot) {
+        const rescan = host.shadowRoot.getElementById('la-rescan-btn');
+        if (rescan) rescan.click();
+      }
+    });
+  </script>
+</body>
+</html>

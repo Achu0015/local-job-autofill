@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LocalApply — Local Candidate Vault & Q&A Manager</title>
+  <link rel="stylesheet" href="dashboard.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-left">
+      <span class="logo-icon">🔒</span>
+      <div>
+        <h1>LocalApply — Local Candidate Vault</h1>
+        <p class="subtitle">100% Stored on Your Local Device (<code>chrome.storage.local</code>) · Zero Cloud Servers · Works Across Workday, Greenhouse, Ashby, Eightfold & Lever</p>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <span class="storage-pill" id="storage-usage">Storage: 0 KB</span>
+      <a href="../test-pages/ats-sandbox.html" target="_blank" class="btn btn-outline">🧪 Open Multi-ATS Sandbox</a>
+      <button class="btn btn-outline" id="btn-load-demo">✨ Load Demo Profile</button>
+      <button class="btn btn-primary" id="btn-save-all">💾 Save All Changes</button>
+    </div>
+  </header>
+
+  <div class="toast-banner" id="toast-banner">Saved to local device storage!</div>
+
+  <main class="layout">
+    <aside class="sidebar">
+      <nav class="nav-list">
+        <button class="nav-btn active" data-tab="tab-profile">👤 Profile & Contact</button>
+        <button class="nav-btn" data-tab="tab-experience">💼 Work Experience</button>
+        <button class="nav-btn" data-tab="tab-education">🎓 Education</button>
+        <button class="nav-btn" data-tab="tab-workauth">🛂 Work Auth & EEO</button>
+        <button class="nav-btn" data-tab="tab-qa">💬 Custom Q&A Bank <span class="nav-count" id="qa-count-badge">0</span></button>
+        <button class="nav-btn" data-tab="tab-files">📎 Resume & Cover Letter</button>
+        <button class="nav-btn" data-tab="tab-settings">⚙️ Modes & JSON Backup</button>
+      </nav>
+
+      <div class="sidebar-card">
+        <h3>On-Demand Categories</h3>
+        <p>Select or unselect which sections autofill by default:</p>
+        <div class="sidebar-cats" id="sidebar-cats">
+          <label><input type="checkbox" data-cat="profile" /> Profile & Contact</label>
+          <label><input type="checkbox" data-cat="experience" /> Work Experience</label>
+          <label><input type="checkbox" data-cat="education" /> Education</label>
+          <label><input type="checkbox" data-cat="workAuth" /> Work Authorization</label>
+          <label><input type="checkbox" data-cat="eeo" /> EEO / Demographics</label>
+          <label><input type="checkbox" data-cat="customQA" /> Custom Q&A Bank</label>
+          <label><input type="checkbox" data-cat="files" /> Resume / Cover Letter</label>
+        </div>
+      </div>
+    </aside>
+
+    <section class="content-area">
+      <!-- TAB 1: PROFILE & CONTACT -->
+      <div class="tab-panel active" id="tab-profile">
+        <div class="panel-header">
+          <div>
+            <h2>Profile & Contact Information</h2>
+            <p>Used for personal details, links, location, and compensation expectations across all ATS forms.</p>
+          </div>
+        </div>
+        <div class="form-grid">
+          <div class="field"><label>First Name</label><input type="text" data-profile="firstName" placeholder="Alex" /></div>
+          <div class="field"><label>Middle Name</label><input type="text" data-profile="middleName" placeholder="" /></div>
+          <div class="field"><label>Last Name</label><input type="text" data-profile="lastName" placeholder="Rivera" /></div>
+          <div class="field"><label>Full Name</label><input type="text" data-profile="fullName" placeholder="Alex Rivera" /></div>
+          <div class="field"><label>Preferred Name</label><input type="text" data-profile="preferredName" placeholder="Alex" /></div>
+          <div class="field"><label>Email Address</label><input type="email" data-profile="email" placeholder="alex.rivera@example.com" /></div>
+          <div class="field"><label>Phone Number</label><input type="tel" data-profile="phone" placeholder="+1 (415) 555-0192" /></div>
+          <div class="field">
+            <label>Phone Device Type</label>
+            <select data-profile="phoneType">
+              <option value="Mobile">Mobile</option>
+              <option value="Home">Home</option>
+              <option value="Work">Work</option>
+            </select>
+          </div>
+          <div class="field"><label>Address Line 1</label><input type="text" data-profile="addressLine1" placeholder="742 Evergreen Terrace" /></div>
+          <div class="field"><label>Address Line 2 (Apt/Suite)</label><input type="text" data-profile="addressLine2" placeholder="Apt 4B" /></div>
+          <div class="field"><label>City</label><input type="text" data-profile="city" placeholder="San Francisco" /></div>
+          <div class="field"><label>State / Province</label><input type="text" data-profile="state" placeholder="California" /></div>
+          <div class="field"><label>Postal / ZIP Code</label><input type="text" data-profile="postalCode" placeholder="94107" /></div>
+          <div class="field"><label>Country</label><input type="text" data-profile="country" placeholder="United States" /></div>
+          <div class="field"><label>LinkedIn URL</label><input type="url" data-profile="linkedin" placeholder="https://linkedin.com/in/alexrivera" /></div>
+          <div class="field"><label>GitHub URL</label><input type="url" data-profile="github" placeholder="https://github.com/alexrivera" /></div>
+          <div class="field"><label>Portfolio / Website URL</label><input type="url" data-profile="portfolio" placeholder="https://alexrivera.dev" /></div>
+          <div class="field"><label>Twitter / X URL</label><input type="url" data-profile="twitter" placeholder="https://x.com/alexrivera" /></div>
+          <div class="field"><label>Current Company</label><input type="text" data-profile="currentCompany" placeholder="Acme Cloud Inc." /></div>
+          <div class="field"><label>Current Job Title</label><input type="text" data-profile="currentTitle" placeholder="Senior Software Engineer" /></div>
+          <div class="field"><label>Total Years of Experience</label><input type="text" data-profile="yearsOfExperience" placeholder="6" /></div>
+          <div class="field"><label>Desired Salary / Compensation</label><input type="text" data-profile="desiredSalary" placeholder="$185,000" /></div>
+          <div class="field"><label>Notice Period / Availability</label><input type="text" data-profile="noticePeriod" placeholder="2 weeks" /></div>
+          <div class="field"><label>Earliest Start Date</label><input type="text" data-profile="earliestStartDate" placeholder="Immediately / 2 weeks notice" /></div>
+          <div class="field full-width"><label>How Did You Hear About Us (Default)</label><input type="text" data-profile="referralSource" placeholder="Company Career Site / LinkedIn" /></div>
+          <div class="field full-width"><label>Professional Summary / Bio / Additional Notes</label><textarea rows="4" data-profile="summary" placeholder="Brief summary of your background and key strengths..."></textarea></div>
+        </div>
+      </div>
+
+      <!-- TAB 2: WORK EXPERIENCE -->
+      <div class="tab-panel" id="tab-experience">
+        <div class="panel-header">
+          <div>
+            <h2>Work Experience Blocks</h2>
+            <p>Used to populate repeating Work Experience sections on Workday, Eightfold, and SmartRecruiters.</p>
+          </div>
+          <button class="btn btn-primary" id="btn-add-exp">+ Add Work Experience</button>
+        </div>
+        <div id="experience-list" class="repeater-list"></div>
+      </div>
+
+      <!-- TAB 3: EDUCATION -->
+      <div class="tab-panel" id="tab-education">
+        <div class="panel-header">
+          <div>
+            <h2>Education Blocks</h2>
+            <p>Used to populate university, degree, major, and graduation dates across ATS forms.</p>
+          </div>
+          <button class="btn btn-primary" id="btn-add-edu">+ Add Education</button>
+        </div>
+        <div id="education-list" class="repeater-list"></div>
+      </div>
+
+      <!-- TAB 4: WORK AUTH & EEO -->
+      <div class="tab-panel" id="tab-workauth">
+        <div class="panel-header">
+          <div>
+            <h2>Work Authorization & EEO / Demographics</h2>
+            <p>Automatically matches dropdowns, radio buttons, and Ashby/Greenhouse/Workday compliance questions.</p>
+          </div>
+        </div>
+        <h3 class="sub-heading">Work Authorization & Compliance</h3>
+        <div class="form-grid">
+          <div class="field">
+            <label>Legally Authorized to Work?</label>
+            <select data-workauth="authorizedToWork">
+              <option value="Yes">Yes</option>
+              <option value="No">No</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Require Visa Sponsorship Now or in Future?</label>
+            <select data-workauth="requireSponsorship">
+              <option value="No">No</option>
+              <option value="Yes">Yes</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Citizenship / Visa Status</label>
+            <input type="text" data-workauth="visaStatus" placeholder="U.S. Citizen / Permanent Resident / H-1B" />
+          </div>
+          <div class="field">
+            <label>At Least 18 Years Old?</label>
+            <select data-workauth="over18">
+              <option value="Yes">Yes</option>
+              <option value="No">No</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Willing to Relocate?</label>
+            <select data-workauth="willingToRelocate">
+              <option value="Yes">Yes</option>
+              <option value="No">No</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Willing to Travel?</label>
+            <select data-workauth="willingToTravel">
+              <option value="Yes">Yes</option>
+              <option value="No">No</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Previously Employed at This Company?</label>
+            <select data-workauth="previouslyEmployed">
+              <option value="No">No</option>
+              <option value="Yes">Yes</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Relatives Working at Company?</label>
+            <select data-workauth="hasRelativesAtCompany">
+              <option value="No">No</option>
+              <option value="Yes">Yes</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Subject to Non-Compete Agreement?</label>
+            <select data-workauth="nonCompeteAgreement">
+              <option value="No">No</option>
+              <option value="Yes">Yes</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Active Security Clearance?</label>
+            <select data-workauth="securityClearance">
+              <option value="No">No</option>
+              <option value="Yes">Yes</option>
+            </select>
+          </div>
+        </div>
+
+        <h3 class="sub-heading" style="margin-top:24px;">Voluntary Self-Identification (EEO)</h3>
+        <div class="form-grid">
+          <div class="field">
+            <label>Gender</label>
+            <input type="text" data-eeo="gender" placeholder="Decline to self-identify / Male / Female / Non-binary" />
+          </div>
+          <div class="field">
+            <label>Preferred Pronouns</label>
+            <input type="text" data-eeo="pronouns" placeholder="Prefer not to say / they/them / he/him / she/her" />
+          </div>
+          <div class="field">
+            <label>Hispanic or Latino?</label>
+            <input type="text" data-eeo="hispanicOrLatino" placeholder="Decline to self-identify / Yes / No" />
+          </div>
+          <div class="field">
+            <label>Race / Ethnicity</label>
+            <input type="text" data-eeo="raceEthnicity" placeholder="Decline to self-identify / Asian / White / Two or More Races..." />
+          </div>
+          <div class="field">
+            <label>Veteran Status</label>
+            <input type="text" data-eeo="veteranStatus" placeholder="I am not a protected veteran" />
+          </div>
+          <div class="field">
+            <label>Disability Status</label>
+            <input type="text" data-eeo="disabilityStatus" placeholder="I do not have a disability" />
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 5: CUSTOM Q&A BANK -->
+      <div class="tab-panel" id="tab-qa">
+        <div class="panel-header">
+          <div>
+            <h2>Custom Question & Answer Memory Bank</h2>
+            <p>Every custom question you save on a job application is stored here locally and fuzzy-matched on future applications. Check or uncheck any Q&A on demand.</p>
+          </div>
+          <button class="btn btn-primary" id="btn-add-qa">+ Add Custom Q&A</button>
+        </div>
+        <div class="qa-toolbar">
+          <input type="search" id="qa-search" placeholder="🔍 Search saved questions or answers..." />
+          <div class="qa-bulk-btns">
+            <button class="btn btn-outline btn-sm" id="btn-qa-enable-all">Enable All</button>
+            <button class="btn btn-outline btn-sm" id="btn-qa-disable-all">Disable All</button>
+          </div>
+        </div>
+        <div id="qa-list" class="repeater-list"></div>
+      </div>
+
+      <!-- TAB 6: RESUME & COVER LETTER FILES -->
+      <div class="tab-panel" id="tab-files">
+        <div class="panel-header">
+          <div>
+            <h2>Local Resume & Cover Letter Auto-Upload</h2>
+            <p>Files are converted to local binary blobs inside <code>chrome.storage.local</code> and automatically injected into <code>&lt;input type="file"&gt;</code> fields via <code>DataTransfer</code>.</p>
+          </div>
+        </div>
+        <div class="file-cards-grid">
+          <div class="file-card">
+            <h3>📄 Primary Resume / CV (PDF, DOCX)</h3>
+            <p id="resume-status" class="file-meta">No resume stored locally yet.</p>
+            <input type="file" id="input-resume-file" accept=".pdf,.doc,.docx,.txt" />
+            <button class="btn btn-outline btn-sm" id="btn-clear-resume" style="margin-top:8px;">Remove Stored Resume</button>
+          </div>
+
+          <div class="file-card">
+            <h3>✉️ Cover Letter (PDF, DOCX)</h3>
+            <p id="cover-status" class="file-meta">No cover letter stored locally yet.</p>
+            <input type="file" id="input-cover-file" accept=".pdf,.doc,.docx,.txt" />
+            <button class="btn btn-outline btn-sm" id="btn-clear-cover" style="margin-top:8px;">Remove Stored Cover Letter</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 7: MODES & BACKUP -->
+      <div class="tab-panel" id="tab-settings">
+        <div class="panel-header">
+          <div>
+            <h2>Capture Modes, Behavior & Local JSON Backup</h2>
+            <p>Choose how answers are learned from job forms and export/import your local database.</p>
+          </div>
+        </div>
+
+        <div class="settings-card">
+          <h3>How Should LocalApply Learn & Save Your Answers?</h3>
+          <div class="radio-card-list">
+            <label class="radio-card">
+              <input type="radio" name="dashCaptureMode" value="both" />
+              <div>
+                <strong>Both Options 1 & 2 (Recommended)</strong>
+                <p>Automatically detects new/edited answers as you fill out job applications so you can select which ones to keep, AND provides a manual "Scan & Save Answers" button at all times.</p>
+              </div>
+            </label>
+            <label class="radio-card">
+              <input type="radio" name="dashCaptureMode" value="auto" />
+              <div>
+                <strong>Option 1: Auto-Detect When Filling Forms</strong>
+                <p>Monitors fields as you fill them and updates the live selection list of new answers to save locally.</p>
+              </div>
+            </label>
+            <label class="radio-card">
+              <input type="radio" name="dashCaptureMode" value="manual" />
+              <div>
+                <strong>Option 2: Manual "Save Answers" Button Only</strong>
+                <p>Never scans automatically while typing; only reads form answers when you explicitly click the "Save Answers" button.</p>
+              </div>
+            </label>
+          </div>
+
+          <div class="checkbox-settings" style="margin-top:16px;">
+            <label><input type="checkbox" id="set-show-widget" /> Automatically show floating controller widget on detected job application pages</label>
+            <label><input type="checkbox" id="set-show-all-pages" /> Show floating controller widget on ALL websites (useful for custom company domains)</label>
+            <label><input type="checkbox" id="set-highlight" /> Highlight autofilled fields with a green border</label>
+            <label><input type="checkbox" id="set-overwrite" /> Overwrite existing non-empty values when autofilling</label>
+          </div>
+        </div>
+
+        <div class="settings-card" style="margin-top:20px;">
+          <h3>Export / Import Local JSON Database</h3>
+          <p style="color:#475569;margin-bottom:12px;">Back up your entire profile, work history, and learned Q&A bank to a local <code>.json</code> file on your computer, or restore from an existing backup.</p>
+          <div class="backup-actions">
+            <button class="btn btn-primary" id="btn-export-json">⬇️ Export Local Data (.json)</button>
+            <label class="btn btn-outline" style="cursor:pointer;">
+              ⬆️ Import Local Data (.json)
+              <input type="file" id="input-import-json" accept=".json" style="display:none;" />
+            </label>
+            <button class="btn btn-danger" id="btn-wipe-data">🗑️ Wipe All Local Storage</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="../src/storage.js"></script>
+  <script src="../src/matcher.js"></script>
+  <script src="dashboard.js"></script>
+</body>
+</html>
