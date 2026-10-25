@@ -1,4 +1,4 @@
-// LocalApply Dashboard Controller (100% Local Storage)
+// LocalApply Dashboard Controller (100% Local Storage + Resume Auto-Applier)
 
 document.addEventListener('DOMContentLoaded', async () => {
   let localData = await window.LocalApplyStorage.getData();
@@ -7,13 +7,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   const toastBanner = document.getElementById('toast-banner');
   const storageUsageEl = document.getElementById('storage-usage');
   const qaCountBadge = document.getElementById('qa-count-badge');
+  const appliedCountBadge = document.getElementById('applied-count-badge');
 
   function showToast(msg) {
     toastBanner.textContent = msg;
     toastBanner.style.display = 'block';
     setTimeout(() => {
       toastBanner.style.display = 'none';
-    }, 3000);
+    }, 3200);
   }
 
   async function refreshStorageSize() {
@@ -30,6 +31,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       .replace(/"/g, '&quot;');
   }
 
+  function parseCsvList(str) {
+    return String(str || '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+
   // Tab navigation
   document.querySelectorAll('.nav-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -42,6 +50,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   function renderAll() {
+    // 0. Auto-Apply & Resume Parser Tab
+    renderAutoApplyTab();
+    renderAppliedJobsList();
+
     // 1. Sidebar categories
     const enabledCats = (localData.settings && localData.settings.enabledCategories) || {};
     document.querySelectorAll('#sidebar-cats input[type="checkbox"]').forEach((cb) => {
@@ -86,6 +98,101 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('set-overwrite').checked = Boolean(localData.settings.overwriteExistingValues);
 
     refreshStorageSize();
+  }
+
+  function renderAutoApplyTab() {
+    if (!localData.autoApply) {
+      localData.autoApply = window.LocalApplyStorage.getDefaultSchema().autoApply;
+    }
+    const parsed = localData.autoApply.parsedResume || {};
+    const prefs = localData.autoApply.preferences || {};
+
+    document.getElementById('autoapply-raw-resume').value = parsed.rawText || '';
+    const statusBadge = document.getElementById('parse-status-badge');
+    if (parsed.lastParsedAt) {
+      statusBadge.textContent = `✓ Parsed ${(parsed.extractedSkills || []).length} skills & ${(parsed.extractedTitles || []).length} target role(s)`;
+    } else {
+      statusBadge.textContent = '';
+    }
+
+    const execMode = prefs.executionMode || 'semi_auto';
+    document.querySelectorAll('input[name="autoApplyExecMode"]').forEach((r) => {
+      r.checked = r.value === execMode;
+    });
+
+    const minScore = Number(prefs.minMatchScore || 65);
+    document.getElementById('dash-min-score-slider').value = String(minScore);
+    document.getElementById('dash-min-score-label').textContent = `${minScore}%`;
+
+    document.getElementById('dash-step-delay').value = String(prefs.stepDelayMs || 900);
+    document.getElementById('dash-max-apps').value = String(prefs.maxApplicationsPerRun || 25);
+    document.getElementById('dash-target-roles').value = (prefs.targetRoles || []).join(', ');
+    document.getElementById('dash-target-skills').value = (prefs.targetSkills || []).join(', ');
+    document.getElementById('dash-preferred-locations').value = (prefs.preferredLocations || []).join(', ');
+    document.getElementById('dash-blacklist-companies').value = (prefs.blacklistedCompanies || []).join(', ');
+    document.getElementById('dash-blacklist-keywords').value = (prefs.blacklistedKeywords || []).join(', ');
+
+    renderPlatformLaunchGrid();
+  }
+
+  function renderPlatformLaunchGrid() {
+    const grid = document.getElementById('platform-launch-grid');
+    if (!grid || !window.LocalApplyResumeParser) return;
+    const platforms = window.LocalApplyResumeParser.generatePlatformSearchUrls(localData);
+
+    grid.innerHTML = platforms
+      .map(
+        (p) => `
+      <div class="repeater-card" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+        <div>
+          <h4 style="font-size:14px;margin-bottom:3px;">${p.icon} ${escapeHtml(p.name)}</h4>
+          <span style="font-size:11px;color:#059669;font-weight:600;">${escapeHtml(p.badge)}</span>
+        </div>
+        <a href="${escapeHtml(p.url)}" target="_blank" class="btn btn-primary btn-sm">Launch Search ↗</a>
+      </div>
+    `
+      )
+      .join('');
+  }
+
+  function renderAppliedJobsList() {
+    const container = document.getElementById('applied-jobs-list');
+    const applied = (localData.autoApply && localData.autoApply.appliedJobs) || [];
+    if (appliedCountBadge) appliedCountBadge.textContent = String(applied.length);
+
+    if (applied.length === 0) {
+      container.innerHTML = `<p style="color:#64748b;font-size:13px;">No applied jobs recorded yet. Run the <b>🚀 Auto-Applier</b> on LinkedIn Jobs or inside the <b>🟦 LinkedIn Auto-Apply Sandbox</b> to see your local application log!</p>`;
+      return;
+    }
+
+    container.innerHTML = applied
+      .map(
+        (job) => `
+      <div class="repeater-card" style="display:flex;align-items:center;justify-content:space-between;gap:14px;">
+        <div>
+          <h4 style="font-size:14px;">${escapeHtml(job.title)} — <span style="color:#0284c7">${escapeHtml(job.company)}</span></h4>
+          <p style="font-size:12px;color:#475569;margin-top:2px;">
+            📍 ${escapeHtml(job.location || 'Remote')} · 🎯 <b>${job.matchScore || 0}% Match</b> · Platform: <b>${escapeHtml(job.platform || 'LinkedIn')}</b>
+          </p>
+          <p style="font-size:11px;color:#059669;font-weight:600;margin-top:3px;">
+            Status: ${escapeHtml(job.status)} · ${new Date(job.appliedAt || Date.now()).toLocaleString()}
+          </p>
+        </div>
+        <button class="btn btn-danger btn-sm btn-del-applied" data-id="${escapeHtml(job.id)}">Remove</button>
+      </div>
+    `
+      )
+      .join('');
+
+    container.querySelectorAll('.btn-del-applied').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const id = btn.getAttribute('data-id');
+        localData.autoApply.appliedJobs = localData.autoApply.appliedJobs.filter((j) => j.id !== id);
+        await window.LocalApplyStorage.saveData(localData);
+        renderAppliedJobsList();
+        showToast('Removed job from local history.');
+      });
+    });
   }
 
   function renderExperienceList() {
@@ -302,12 +409,180 @@ document.addEventListener('DOMContentLoaded', async () => {
       const key = el.getAttribute('data-eeo');
       localData.eeo[key] = el.value.trim();
     });
+
+    // Collect Auto-Apply preferences
+    if (!localData.autoApply) {
+      localData.autoApply = window.LocalApplyStorage.getDefaultSchema().autoApply;
+    }
+    const prefs = localData.autoApply.preferences;
+    prefs.minMatchScore = Number(document.getElementById('dash-min-score-slider').value || 65);
+    prefs.stepDelayMs = Number(document.getElementById('dash-step-delay').value || 900);
+    prefs.maxApplicationsPerRun = Number(document.getElementById('dash-max-apps').value || 25);
+    prefs.targetRoles = parseCsvList(document.getElementById('dash-target-roles').value);
+    prefs.targetSkills = parseCsvList(document.getElementById('dash-target-skills').value);
+    prefs.preferredLocations = parseCsvList(document.getElementById('dash-preferred-locations').value);
+    prefs.blacklistedCompanies = parseCsvList(document.getElementById('dash-blacklist-companies').value);
+    prefs.blacklistedKeywords = parseCsvList(document.getElementById('dash-blacklist-keywords').value);
+    localData.autoApply.parsedResume.rawText = document.getElementById('autoapply-raw-resume').value;
   }
+
+  // Resume Upload & Parse in Step 1
+  document.getElementById('autoapply-resume-upload').addEventListener('change', async (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+
+    // Also save binary to localData.files.resume so Easy Apply & ATS forms have the PDF/DOCX ready
+    const reader = new FileReader();
+    reader.onload = async () => {
+      localData.files.resume = {
+        name: file.name,
+        type: file.type || 'application/pdf',
+        size: file.size,
+        dataUrl: reader.result,
+        updatedAt: Date.now()
+      };
+      await window.LocalApplyStorage.saveData(localData);
+      renderFilesStatus();
+    };
+    reader.readAsDataURL(file);
+
+    const extractedText = await window.LocalApplyResumeParser.extractTextFromUploadedFile(file);
+    if (extractedText) {
+      document.getElementById('autoapply-raw-resume').value = extractedText;
+      runResumeParseAndSync(extractedText);
+    } else {
+      showToast('Stored resume file! Paste resume text below if your PDF is scanned/image-based.');
+    }
+  });
+
+  document.getElementById('btn-parse-resume-text').addEventListener('click', () => {
+    const rawText = document.getElementById('autoapply-raw-resume').value.trim();
+    if (!rawText) {
+      showToast('Paste your resume text or upload a resume file first.');
+      return;
+    }
+    runResumeParseAndSync(rawText);
+  });
+
+  async function runResumeParseAndSync(rawText) {
+    const parsed = window.LocalApplyResumeParser.parseResumeText(rawText);
+    localData.autoApply.parsedResume = parsed;
+
+    // Sync extracted skills & titles into preferences
+    if (parsed.extractedTitles.length > 0) {
+      localData.autoApply.preferences.targetRoles = parsed.extractedTitles;
+    }
+    if (parsed.extractedSkills.length > 0) {
+      localData.autoApply.preferences.targetSkills = parsed.extractedSkills;
+    }
+
+    // Sync non-empty contact fields into profile
+    if (parsed.firstName && !localData.profile.firstName) localData.profile.firstName = parsed.firstName;
+    if (parsed.lastName && !localData.profile.lastName) localData.profile.lastName = parsed.lastName;
+    if (parsed.fullName && !localData.profile.fullName) localData.profile.fullName = parsed.fullName;
+    if (parsed.email && !localData.profile.email) localData.profile.email = parsed.email;
+    if (parsed.phone && !localData.profile.phone) localData.profile.phone = parsed.phone;
+    if (parsed.city && !localData.profile.city) localData.profile.city = parsed.city;
+    if (parsed.state && !localData.profile.state) localData.profile.state = parsed.state;
+    if (parsed.linkedin && !localData.profile.linkedin) localData.profile.linkedin = parsed.linkedin;
+    if (parsed.github && !localData.profile.github) localData.profile.github = parsed.github;
+    if (parsed.yearsOfExperience) localData.profile.yearsOfExperience = parsed.yearsOfExperience;
+
+    await window.LocalApplyStorage.saveData(localData);
+    renderAll();
+    showToast(
+      `Parsed resume locally: found ${parsed.extractedSkills.length} skills & ${parsed.extractedTitles.length} target role(s)!`
+    );
+  }
+
+  // Auto-Apply Execution Mode & Slider listeners
+  document.querySelectorAll('input[name="autoApplyExecMode"]').forEach((r) => {
+    r.addEventListener('change', async () => {
+      if (r.checked) {
+        localData.autoApply.preferences.executionMode = r.value;
+        await window.LocalApplyStorage.saveData(localData);
+        showToast(
+          `Auto-Apply mode set to: ${r.value === 'full_auto' ? 'Full Auto-Apply Loop' : 'Select & Review Queue'}`
+        );
+      }
+    });
+  });
+
+  document.getElementById('dash-min-score-slider').addEventListener('input', (e) => {
+    document.getElementById('dash-min-score-label').textContent = `${e.target.value}%`;
+  });
+
+  document.getElementById('dash-min-score-slider').addEventListener('change', async (e) => {
+    localData.autoApply.preferences.minMatchScore = Number(e.target.value);
+    await window.LocalApplyStorage.saveData(localData);
+  });
+
+  [
+    'dash-target-roles',
+    'dash-target-skills',
+    'dash-preferred-locations',
+    'dash-blacklist-companies',
+    'dash-blacklist-keywords',
+    'dash-step-delay',
+    'dash-max-apps'
+  ].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.addEventListener('change', async () => {
+        collectFormStateIntoLocalData();
+        await window.LocalApplyStorage.saveData(localData);
+        renderPlatformLaunchGrid();
+      });
+    }
+  });
+
+  // Applied Jobs History Export & Clear
+  document.getElementById('btn-export-applied-csv').addEventListener('click', () => {
+    const applied = (localData.autoApply && localData.autoApply.appliedJobs) || [];
+    if (applied.length === 0) {
+      showToast('No applied jobs to export yet.');
+      return;
+    }
+    const headers = ['Job Title', 'Company', 'Location', 'Platform', 'Match Score %', 'Status', 'Applied At', 'URL'];
+    const rows = applied.map((j) =>
+      [
+        j.title,
+        j.company,
+        j.location,
+        j.platform,
+        j.matchScore,
+        j.status,
+        new Date(j.appliedAt || Date.now()).toISOString(),
+        j.url
+      ]
+        .map((v) => `"${String(v || '').replace(/"/g, '""')}"`)
+        .join(',')
+    );
+    const csv = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `localapply-applied-jobs-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('Exported Applied Jobs History to CSV.');
+  });
+
+  document.getElementById('btn-clear-applied').addEventListener('click', async () => {
+    if (confirm('Clear your local applied jobs history?')) {
+      localData.autoApply.appliedJobs = [];
+      await window.LocalApplyStorage.saveData(localData);
+      renderAppliedJobsList();
+      showToast('Cleared applied jobs history.');
+    }
+  });
 
   // Save All button
   document.getElementById('btn-save-all').addEventListener('click', async () => {
     collectFormStateIntoLocalData();
     await window.LocalApplyStorage.saveData(localData);
+    renderPlatformLaunchGrid();
     await refreshStorageSize();
     showToast('All changes saved to local device storage!');
   });
@@ -452,9 +727,24 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Load Demo Profile Button
   document.getElementById('btn-load-demo').addEventListener('click', async () => {
-    // Create a sample minimal PDF dataURL so resume auto-upload also works out of the box
     const samplePdfContent = '%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF';
     const samplePdfBase64 = 'data:application/pdf;base64,' + btoa(samplePdfContent);
+
+    const sampleResumeText = `Alex Rivera
+San Francisco, CA | alex.rivera@example.com | +1 (415) 555-0192
+https://www.linkedin.com/in/alexrivera | https://github.com/alexrivera
+
+SUMMARY
+Senior Software Engineer & Full Stack Engineer with 7+ years of experience building distributed systems, cloud infrastructure, and real-time web applications.
+
+TECHNICAL SKILLS
+TypeScript, JavaScript, Python, Go, SQL, React, Next.js, Node.js, GraphQL, PostgreSQL, Redis, Kafka, AWS, Docker, Kubernetes, Terraform, CI/CD, Microservices, Distributed Systems, System Design.
+
+WORK EXPERIENCE
+Senior Full-Stack Engineer | CloudScale Systems | 2022 - Present
+- Architected real-time telemetry pipeline handling 50k req/sec using Go, TypeScript, Kafka, and PostgreSQL on AWS & Kubernetes.
+Software Engineer | Horizon Fintech | 2019 - 2022
+- Built core payment settlement microservices with Python, Node.js, React, and Docker.`;
 
     localData.profile = {
       firstName: 'Alex',
@@ -556,9 +846,28 @@ document.addEventListener('DOMContentLoaded', async () => {
       updatedAt: Date.now()
     };
 
+    const parsedDemo = window.LocalApplyResumeParser.parseResumeText(sampleResumeText);
+    localData.autoApply = {
+      parsedResume: parsedDemo,
+      preferences: {
+        executionMode: 'semi_auto',
+        minMatchScore: 65,
+        targetRoles: parsedDemo.extractedTitles,
+        targetSkills: parsedDemo.extractedSkills,
+        preferredLocations: ['Remote', 'San Francisco', 'New York'],
+        remoteOnly: false,
+        easyApplyOnly: false,
+        blacklistedCompanies: ['SpamRecruiters Inc'],
+        blacklistedKeywords: ['Unpaid', 'Commission Only'],
+        stepDelayMs: 700,
+        maxApplicationsPerRun: 25
+      },
+      appliedJobs: localData.autoApply ? localData.autoApply.appliedJobs || [] : []
+    };
+
     await window.LocalApplyStorage.saveData(localData);
     renderAll();
-    showToast('Loaded Demo Candidate Profile + Sample Resume into local storage!');
+    showToast('Loaded Demo Resume, Extracted 20 Skills, and Configured Auto-Applier!');
   });
 
   // Export JSON

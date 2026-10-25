@@ -112,17 +112,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // Show on-page widget button
-  document.getElementById('btn-show-widget').addEventListener('click', () => {
-    if (typeof chrome !== 'undefined' && chrome.tabs) {
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (!tabs || !tabs[0]) return;
-        chrome.tabs.sendMessage(tabs[0].id, { type: 'SHOW_WIDGET', tab: 'autofill' }, () => {
-          window.close();
+  // Show Auto-Apply Queue button
+  const btnAutoApplyQueue = document.getElementById('btn-autoapply-queue');
+  if (btnAutoApplyQueue) {
+    btnAutoApplyQueue.addEventListener('click', () => {
+      if (typeof chrome !== 'undefined' && chrome.tabs) {
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+          if (!tabs || !tabs[0]) return;
+          chrome.tabs.sendMessage(tabs[0].id, { type: 'TRIGGER_AUTOAPPLY_TAB' }, () => {
+            window.close();
+          });
         });
-      });
-    }
-  });
+      }
+    });
+  }
 
   // Open Dashboard button
   document.getElementById('btn-dashboard').addEventListener('click', () => {

@@ -28,7 +28,9 @@
       "js": [
         "src/storage.js",
         "src/matcher.js",
+        "src/resume-parser.js",
         "src/adapters.js",
+        "src/job-copilot.js",
         "src/content.js"
       ],
       "run_at": "document_idle",

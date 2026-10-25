@@ -1,5 +1,8 @@
 // LocalApply Content Script & On-Page Shadow DOM Controller Widget
-// Provides on-demand category & field-level selection for both Autofill and Local Answer Capture
+// Provides:
+// 1. On-demand category & field-level selection for Autofill
+// 2. Auto-Capture & Manual Answer Learning to Local Storage
+// 3. Resume-to-Jobs Discovery Scanner & Multi-Step Auto-Apply Queue (LinkedIn Easy Apply, Indeed, Glassdoor, etc.)
 
 (function () {
   if (window.__localApplyInjected) return;
@@ -8,11 +11,12 @@
   let shadowRoot = null;
   let widgetState = {
     minimized: false,
-    activeTab: 'autofill', // 'autofill' | 'capture'
+    activeTab: 'autofill', // 'autofill' | 'capture' | 'autoapply'
     platform: { id: 'universal', name: 'Universal ATS', badgeColor: '#10b981' },
+    jobBoard: { id: 'direct_ats', name: 'Direct ATS', isJobBoard: false },
     localData: null,
     scannedItems: [], // { fieldId, scannedField, matchResult, selectedToFill, currentPageValue, selectedToSave }
-    autoCapturedPending: new Map(), // fieldId -> { question, answer, canonicalKey, section, category, selected }
+    discoveredJobs: [], // { jobId, title, company, location, isEasyApply, scoreResult, selected, cardElement }
     statusMessage: ''
   };
 
@@ -28,10 +32,19 @@
 
   async function initContentScript() {
     widgetState.platform = window.LocalApplyAdapters.detectPlatform(document, window.location);
+    widgetState.jobBoard = window.LocalApplyJobCopilot
+      ? window.LocalApplyJobCopilot.detectJobBoard(document, window.location)
+      : { id: 'direct_ats', name: 'Direct ATS', isJobBoard: false };
     widgetState.localData = await window.LocalApplyStorage.getData();
+
+    // If on a multi-job board feed (like LinkedIn Jobs, Indeed, etc.), default to the Auto-Apply tab
+    if (widgetState.jobBoard.isJobBoard) {
+      widgetState.activeTab = 'autoapply';
+    }
 
     const shouldMount =
       widgetState.localData.settings.showWidgetOnAllPages ||
+      widgetState.jobBoard.isJobBoard ||
       (widgetState.localData.settings.showFloatingWidget &&
         window.LocalApplyAdapters.isLikelyJobApplicationPage(document, window.location));
 
@@ -41,7 +54,6 @@
       attachAutoCaptureListeners();
     }
 
-    // Listen for messages from extension popup
     if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
       chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         handleRuntimeMessage(msg).then(sendResponse);
@@ -58,9 +70,13 @@
       await refreshScan();
       return {
         ok: true,
-        platform: widgetState.platform,
+        platform: widgetState.jobBoard.isJobBoard
+          ? { id: widgetState.jobBoard.id, name: widgetState.jobBoard.name, badgeColor: '#0284c7' }
+          : widgetState.platform,
         totalFields: widgetState.scannedItems.length,
-        matchedCount: widgetState.scannedItems.filter((i) => i.matchResult.matched && i.selectedToFill).length
+        matchedCount: widgetState.scannedItems.filter((i) => i.matchResult.matched && i.selectedToFill).length,
+        jobsCount: widgetState.discoveredJobs.length,
+        eligibleJobsCount: widgetState.discoveredJobs.filter((j) => j.selected).length
       };
     }
 
@@ -90,12 +106,24 @@
       return { ok: true };
     }
 
+    if (msg.type === 'TRIGGER_AUTOAPPLY_TAB') {
+      if (!shadowRoot) mountFloatingWidget();
+      widgetState.minimized = false;
+      widgetState.activeTab = 'autoapply';
+      await refreshScan();
+      renderWidget();
+      return { ok: true };
+    }
+
     return { ok: true };
   }
 
   async function refreshScan() {
     widgetState.localData = await window.LocalApplyStorage.getData();
     widgetState.platform = window.LocalApplyAdapters.detectPlatform(document, window.location);
+    widgetState.jobBoard = window.LocalApplyJobCopilot
+      ? window.LocalApplyJobCopilot.detectJobBoard(document, window.location)
+      : { id: 'direct_ats', name: 'Direct ATS', isJobBoard: false };
 
     const enabledCats = widgetState.localData.settings.enabledCategories || {};
     const rawFields = window.LocalApplyAdapters.scanPageFields(document);
@@ -113,7 +141,6 @@
         ? prevSelectedFill.get(sf.fieldId) && catEnabled
         : defaultFill;
 
-      // Determine if user has entered a new or different answer on the page worth saving
       const isNewOrChanged =
         Boolean(currentVal) &&
         sf.controlType !== 'file' &&
@@ -134,13 +161,26 @@
       };
     });
 
-    // Update extension badge with matched count
-    const matchedCount = widgetState.scannedItems.filter((i) => i.matchResult.matched).length;
+    // Scan job listings on the page for Auto-Apply
+    if (window.LocalApplyJobCopilot) {
+      const prevJobSel = new Map(widgetState.discoveredJobs.map((j) => [j.jobId, j.selected]));
+      const scannedJobs = window.LocalApplyJobCopilot.scanJobsOnPage(widgetState.localData, document);
+      widgetState.discoveredJobs = scannedJobs.map((j) => ({
+        ...j,
+        selected: prevJobSel.has(j.jobId) ? prevJobSel.get(j.jobId) : j.scoreResult.eligible
+      }));
+    }
+
+    const badgeCount =
+      widgetState.discoveredJobs.length > 0
+        ? widgetState.discoveredJobs.filter((j) => j.selected).length
+        : widgetState.scannedItems.filter((i) => i.matchResult.matched).length;
+
     if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
       try {
-        chrome.runtime.sendMessage({ type: 'UPDATE_BADGE', count: matchedCount });
+        chrome.runtime.sendMessage({ type: 'UPDATE_BADGE', count: badgeCount });
       } catch (e) {
-        // ignore context invalidated
+        // ignore
       }
     }
 
@@ -156,9 +196,8 @@
 
       widgetState.localData = await window.LocalApplyStorage.getData();
       const mode = widgetState.localData.settings.captureMode || 'both';
-      if (mode === 'manual') return; // In manual-only mode, wait until user clicks "Scan & Save Answers"
+      if (mode === 'manual') return;
 
-      // Refresh values from page so Capture tab and auto-capture counter stay up to date
       await refreshScan();
     };
 
@@ -210,6 +249,24 @@
     return itemsToSave.length;
   }
 
+  async function executeAutoApplyQueue() {
+    const selectedJobs = widgetState.discoveredJobs.filter((j) => j.selected);
+    if (selectedJobs.length === 0) {
+      showStatusToast('Check at least one job in the queue to apply.');
+      return;
+    }
+
+    await window.LocalApplyJobCopilot.runAutoApplyQueue(
+      selectedJobs,
+      widgetState.localData,
+      () => {
+        renderWidget();
+      }
+    );
+
+    await refreshScan();
+  }
+
   function showStatusToast(msg) {
     widgetState.statusMessage = msg;
     renderWidget();
@@ -246,6 +303,12 @@
     const settings = widgetState.localData.settings || {};
     const enabledCats = settings.enabledCategories || {};
     const captureMode = settings.captureMode || 'both';
+    const autoApplyPrefs = (widgetState.localData.autoApply && widgetState.localData.autoApply.preferences) || {};
+    const executionMode = autoApplyPrefs.executionMode || 'semi_auto';
+    const minMatchScore = Number(autoApplyPrefs.minMatchScore || 65);
+    const copilotState = window.LocalApplyJobCopilot
+      ? window.LocalApplyJobCopilot.getState()
+      : { isRunning: false, statusLog: '' };
 
     const matchedItems = widgetState.scannedItems.filter((i) => i.matchResult.matched);
     const selectedFillCount = matchedItems.filter((i) => i.selectedToFill).length;
@@ -255,6 +318,11 @@
     );
     const newOrChangedCount = capturableItems.filter((i) => i.isNewOrChanged).length;
     const selectedSaveCount = capturableItems.filter((i) => i.selectedToSave).length;
+
+    const selectedJobsCount = widgetState.discoveredJobs.filter((j) => j.selected).length;
+    const headerPlatformName = widgetState.jobBoard.isJobBoard
+      ? widgetState.jobBoard.name
+      : widgetState.platform.name;
 
     const styles = `
       :host {
@@ -269,8 +337,8 @@
         position: fixed;
         bottom: 20px;
         right: 20px;
-        width: 390px;
-        max-height: 82vh;
+        width: 415px;
+        max-height: 84vh;
         background: #ffffff;
         border: 1px solid #e2e8f0;
         border-radius: 14px;
@@ -331,7 +399,7 @@
         text-transform: uppercase;
         padding: 2px 7px;
         border-radius: 99px;
-        background: ${widgetState.platform.badgeColor};
+        background: ${widgetState.jobBoard.isJobBoard ? '#0284c7' : widgetState.platform.badgeColor};
         color: #fff;
       }
       .la-header-actions {
@@ -354,7 +422,7 @@
       }
       .la-tabs {
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: 1fr 1fr 1fr;
         background: #f1f5f9;
         padding: 4px;
         gap: 4px;
@@ -363,16 +431,16 @@
       .la-tab {
         border: none;
         background: transparent;
-        padding: 7px 10px;
+        padding: 7px 6px;
         border-radius: 8px;
-        font-size: 12px;
+        font-size: 11.5px;
         font-weight: 600;
         color: #475569;
         cursor: pointer;
         display: flex;
         align-items: center;
         justify-content: center;
-        gap: 6px;
+        gap: 4px;
       }
       .la-tab.active {
         background: #ffffff;
@@ -382,7 +450,7 @@
       .la-count-pill {
         background: #e2e8f0;
         color: #0f172a;
-        padding: 1px 6px;
+        padding: 1px 5px;
         border-radius: 99px;
         font-size: 10px;
         font-weight: 700;
@@ -390,6 +458,10 @@
       .la-count-pill.green {
         background: #d1fae5;
         color: #065f46;
+      }
+      .la-count-pill.blue {
+        background: #dbeafe;
+        color: #1e40af;
       }
       .la-count-pill.amber {
         background: #fef3c7;
@@ -440,9 +512,8 @@
       .la-field-list {
         border: 1px solid #e2e8f0;
         border-radius: 9px;
-        max-height: 220px;
+        max-height: 215px;
         overflow-y: auto;
-        divide-y: 1px solid #f1f5f9;
         background: #fcfcfd;
       }
       .la-field-row {
@@ -504,6 +575,30 @@
         color: #334155;
         cursor: pointer;
       }
+      .la-slider-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        background: #f8fafc;
+        padding: 7px 10px;
+        border-radius: 8px;
+        border: 1px solid #e2e8f0;
+        font-size: 11.5px;
+      }
+      .la-slider-row input[type="range"] {
+        flex: 1;
+        accent-color: #10b981;
+      }
+      .la-status-bar {
+        background: #eff6ff;
+        border: 1px solid #bfdbfe;
+        color: #1e40af;
+        padding: 6px 9px;
+        border-radius: 7px;
+        font-size: 11px;
+        font-weight: 600;
+      }
       .la-footer {
         padding: 10px 12px;
         border-top: 1px solid #e2e8f0;
@@ -530,6 +625,17 @@
       }
       .la-btn-primary:hover {
         background: #059669;
+      }
+      .la-btn-danger {
+        flex: 1;
+        background: #ef4444;
+        color: #ffffff;
+        border: none;
+        border-radius: 8px;
+        padding: 9px 12px;
+        font-size: 12px;
+        font-weight: 700;
+        cursor: pointer;
       }
       .la-btn-secondary {
         background: #ffffff;
@@ -576,10 +682,13 @@
     if (widgetState.minimized) {
       shadowRoot.innerHTML = `
         <style>${styles}</style>
-        <div class="la-pill-minimized" id="la-expand-btn" title="Open LocalApply Autofill & Answer Memory">
+        <div class="la-pill-minimized" id="la-expand-btn" title="Open LocalApply Autofill & Auto-Applier">
           <span>🔒 LocalApply</span>
-          <span class="la-pill-badge">${selectedFillCount} Ready</span>
-          ${newOrChangedCount > 0 ? `<span class="la-pill-badge" style="background:#f59e0b">${newOrChangedCount} New</span>` : ''}
+          ${
+            widgetState.discoveredJobs.length > 0
+              ? `<span class="la-pill-badge" style="background:#0284c7">${selectedJobsCount} Jobs Matched</span>`
+              : `<span class="la-pill-badge">${selectedFillCount} Fields</span>`
+          }
         </div>
       `;
       shadowRoot.getElementById('la-expand-btn').addEventListener('click', () => {
@@ -622,7 +731,7 @@
       <div class="la-field-list">
         ${
           widgetState.scannedItems.length === 0
-            ? `<div style="padding:14px;text-align:center;color:#64748b;">No form fields detected on this page yet. Click <b>Rescan</b> if a form just loaded.</div>`
+            ? `<div style="padding:14px;text-align:center;color:#64748b;">No form fields detected yet. Click <b>Rescan</b> or switch to <b>🚀 Auto-Apply</b> if browsing a job feed.</div>`
             : widgetState.scannedItems
                 .map((item) => {
                   const m = item.matchResult;
@@ -709,6 +818,97 @@
       </div>
     `;
 
+    const autoApplyTabHtml = `
+      <div class="la-section-label">
+        <span>1. Execution Mode</span>
+      </div>
+      <div class="la-mode-selector">
+        <label class="la-mode-opt">
+          <input type="radio" name="la_exec_mode" value="semi_auto" ${executionMode === 'semi_auto' ? 'checked' : ''} />
+          <span><b>Select & Review Queue:</b> Fill steps & pause before final Submit</span>
+        </label>
+        <label class="la-mode-opt">
+          <input type="radio" name="la_exec_mode" value="full_auto" ${executionMode === 'full_auto' ? 'checked' : ''} />
+          <span><b>Full Auto-Apply Loop:</b> Auto-step & submit all selected jobs</span>
+        </label>
+      </div>
+
+      <div class="la-slider-row">
+        <span><b>Min Resume Match:</b> <span id="la-min-score-val">${minMatchScore}%</span></span>
+        <input type="range" id="la-min-score-slider" min="20" max="95" step="5" value="${minMatchScore}" />
+      </div>
+
+      ${
+        copilotState.statusLog
+          ? `<div class="la-status-bar">🤖 ${escapeHtml(copilotState.statusLog)}</div>`
+          : ''
+      }
+
+      <div class="la-section-label">
+        <span>2. Discovered Jobs (${selectedJobsCount}/${widgetState.discoveredJobs.length} selected)</span>
+        <div>
+          <button class="la-link-btn" id="la-jobs-select-eligible">Match ≥${minMatchScore}%</button> ·
+          <button class="la-link-btn" id="la-jobs-select-all">All</button> ·
+          <button class="la-link-btn" id="la-jobs-select-none">None</button>
+        </div>
+      </div>
+
+      <div class="la-field-list">
+        ${
+          widgetState.discoveredJobs.length === 0
+            ? `<div style="padding:14px;text-align:center;color:#64748b;">
+                No job cards detected on this page yet. Open LinkedIn Jobs, Indeed, Glassdoor, or click <b>⚙️ Local DB</b> → <b>🧠 Resume Auto-Applier</b> to launch tailored searches!
+              </div>`
+            : widgetState.discoveredJobs
+                .map((j) => {
+                  const sr = j.scoreResult;
+                  const statusNote = sr.alreadyApplied
+                    ? '✓ Already Applied'
+                    : sr.blacklisted
+                    ? `⛔ ${sr.blacklistReason}`
+                    : sr.matchedSkills.length > 0
+                    ? `Matched Skills: ${sr.matchedSkills.slice(0, 5).join(', ')}`
+                    : 'Matched by Role & Seniority';
+                  return `
+                    <label class="la-field-row">
+                      <input
+                        type="checkbox"
+                        class="la-job-check"
+                        data-job-id="${escapeHtml(j.jobId)}"
+                        ${j.selected ? 'checked' : ''}
+                      />
+                      <div class="la-field-info">
+                        <div class="la-field-q">${escapeHtml(j.title)} — ${escapeHtml(j.company)}</div>
+                        <div class="la-field-val" style="color:${sr.score >= minMatchScore ? '#059669' : '#d97706'}">
+                          🎯 ${sr.score}% Match · ${escapeHtml(j.location)} ${j.isEasyApply ? '· ⚡ Easy Apply' : ''}
+                        </div>
+                        <div class="la-field-meta">${escapeHtml(statusNote)}</div>
+                      </div>
+                    </label>
+                  `;
+                })
+                .join('')
+        }
+      </div>
+    `;
+
+    let activeBodyHtml = autofillTabHtml;
+    if (widgetState.activeTab === 'capture') activeBodyHtml = captureTabHtml;
+    if (widgetState.activeTab === 'autoapply') activeBodyHtml = autoApplyTabHtml;
+
+    let primaryActionBtnHtml = `<button class="la-btn-primary" id="la-run-autofill-btn">⚡ Autofill Selected (${selectedFillCount})</button>`;
+    if (widgetState.activeTab === 'capture') {
+      primaryActionBtnHtml = `<button class="la-btn-primary" id="la-run-save-btn">💾 Save Selected Locally (${selectedSaveCount})</button>`;
+    } else if (widgetState.activeTab === 'autoapply') {
+      if (copilotState.isRunning) {
+        primaryActionBtnHtml = `<button class="la-btn-danger" id="la-stop-autoapply-btn">⏹ Stop Auto-Apply Loop</button>`;
+      } else {
+        primaryActionBtnHtml = `<button class="la-btn-primary" id="la-run-autoapply-btn">🚀 ${
+          executionMode === 'full_auto' ? 'Auto-Apply Selected' : 'Fill & Review Selected'
+        } (${selectedJobsCount})</button>`;
+      }
+    }
+
     shadowRoot.innerHTML = `
       <style>${styles}</style>
       <div class="la-widget">
@@ -716,10 +916,10 @@
           <div class="la-brand">
             <span>🔒</span>
             <span class="la-brand-title">LocalApply</span>
-            <span class="la-platform-tag">${escapeHtml(widgetState.platform.name)}</span>
+            <span class="la-platform-tag">${escapeHtml(headerPlatformName)}</span>
           </div>
           <div class="la-header-actions">
-            <button class="la-icon-btn" id="la-open-dashboard" title="Open Local Profile & Q&A Dashboard">⚙️ Local DB</button>
+            <button class="la-icon-btn" id="la-open-dashboard" title="Open Local Candidate Vault & Resume Matcher">⚙️ Local DB</button>
             <button class="la-icon-btn" id="la-minimize-btn" title="Minimize widget">—</button>
           </div>
         </div>
@@ -729,27 +929,27 @@
             <span>⚡ Autofill</span>
             <span class="la-count-pill green">${selectedFillCount}</span>
           </button>
+          <button class="la-tab ${widgetState.activeTab === 'autoapply' ? 'active' : ''}" id="la-tab-autoapply">
+            <span>🚀 Auto-Apply</span>
+            <span class="la-count-pill blue">${selectedJobsCount}</span>
+          </button>
           <button class="la-tab ${widgetState.activeTab === 'capture' ? 'active' : ''}" id="la-tab-capture">
-            <span>💾 Save Answers</span>
+            <span>💾 Save Q&A</span>
             <span class="la-count-pill ${newOrChangedCount > 0 ? 'amber' : ''}">${
-              newOrChangedCount > 0 ? `${newOrChangedCount} new` : capturableItems.length
+              newOrChangedCount > 0 ? `${newOrChangedCount}` : capturableItems.length
             }</span>
           </button>
         </div>
 
         <div class="la-body">
-          ${widgetState.activeTab === 'autofill' ? autofillTabHtml : captureTabHtml}
+          ${activeBodyHtml}
         </div>
 
         <div class="la-footer">
           ${widgetState.statusMessage ? `<div class="la-toast">${escapeHtml(widgetState.statusMessage)}</div>` : ''}
           <div class="la-btn-row">
-            <button class="la-btn-secondary" id="la-rescan-btn">↻ Rescan Page</button>
-            ${
-              widgetState.activeTab === 'autofill'
-                ? `<button class="la-btn-primary" id="la-run-autofill-btn">⚡ Autofill Selected (${selectedFillCount})</button>`
-                : `<button class="la-btn-primary" id="la-run-save-btn">💾 Save Selected Locally (${selectedSaveCount})</button>`
-            }
+            <button class="la-btn-secondary" id="la-rescan-btn">↻ Rescan</button>
+            ${primaryActionBtnHtml}
           </div>
           <div class="la-local-badge">
             <span>🛡️ 100% Stored on Your Local Device · Zero Cloud Calls</span>
@@ -791,6 +991,14 @@
       });
     }
 
+    const tabAutoApply = shadowRoot.getElementById('la-tab-autoapply');
+    if (tabAutoApply) {
+      tabAutoApply.addEventListener('click', async () => {
+        widgetState.activeTab = 'autoapply';
+        await refreshScan();
+      });
+    }
+
     const tabCapture = shadowRoot.getElementById('la-tab-capture');
     if (tabCapture) {
       tabCapture.addEventListener('click', async () => {
@@ -803,7 +1011,7 @@
     if (rescanBtn) {
       rescanBtn.addEventListener('click', async () => {
         await refreshScan();
-        showStatusToast('Rescanned form fields on page.');
+        showStatusToast('Rescanned fields and job cards on page.');
       });
     }
 
@@ -821,6 +1029,23 @@
       });
     }
 
+    const runAutoApplyBtn = shadowRoot.getElementById('la-run-autoapply-btn');
+    if (runAutoApplyBtn) {
+      runAutoApplyBtn.addEventListener('click', () => {
+        executeAutoApplyQueue();
+      });
+    }
+
+    const stopAutoApplyBtn = shadowRoot.getElementById('la-stop-autoapply-btn');
+    if (stopAutoApplyBtn) {
+      stopAutoApplyBtn.addEventListener('click', () => {
+        if (window.LocalApplyJobCopilot) {
+          window.LocalApplyJobCopilot.requestStop();
+          renderWidget();
+        }
+      });
+    }
+
     // Category chip toggles
     shadowRoot.querySelectorAll('.la-cat-chip').forEach((chip) => {
       chip.addEventListener('click', async (e) => {
@@ -833,7 +1058,6 @@
         widgetState.localData.settings.enabledCategories = currentCats;
         await window.LocalApplyStorage.saveData(widgetState.localData);
 
-        // Update matching field selections for that category
         for (const item of widgetState.scannedItems) {
           if (item.matchResult.category === key) {
             item.selectedToFill = nextVal && item.matchResult.matched;
@@ -951,6 +1175,74 @@
       saveSelectNone.addEventListener('click', () => {
         for (const item of widgetState.scannedItems) {
           item.selectedToSave = false;
+        }
+        renderWidget();
+      });
+    }
+
+    // Auto-Apply Execution Mode radios
+    shadowRoot.querySelectorAll('input[name="la_exec_mode"]').forEach((radio) => {
+      radio.addEventListener('change', async () => {
+        if (radio.checked) {
+          widgetState.localData.autoApply.preferences.executionMode = radio.value;
+          await window.LocalApplyStorage.saveData(widgetState.localData);
+          renderWidget();
+        }
+      });
+    });
+
+    // Min Match Score slider
+    const minSlider = shadowRoot.getElementById('la-min-score-slider');
+    if (minSlider) {
+      minSlider.addEventListener('change', async () => {
+        const newMin = Number(minSlider.value);
+        widgetState.localData.autoApply.preferences.minMatchScore = newMin;
+        await window.LocalApplyStorage.saveData(widgetState.localData);
+        for (const j of widgetState.discoveredJobs) {
+          j.selected = !j.scoreResult.alreadyApplied && !j.scoreResult.blacklisted && j.scoreResult.score >= newMin;
+        }
+        renderWidget();
+      });
+    }
+
+    // Individual Job Queue Checkboxes
+    shadowRoot.querySelectorAll('.la-job-check').forEach((cb) => {
+      cb.addEventListener('change', () => {
+        const jid = cb.getAttribute('data-job-id');
+        const found = widgetState.discoveredJobs.find((j) => j.jobId === jid);
+        if (found) {
+          found.selected = cb.checked;
+          renderWidget();
+        }
+      });
+    });
+
+    const jobsEligible = shadowRoot.getElementById('la-jobs-select-eligible');
+    if (jobsEligible) {
+      jobsEligible.addEventListener('click', () => {
+        const minScore = Number(widgetState.localData.autoApply.preferences.minMatchScore || 65);
+        for (const j of widgetState.discoveredJobs) {
+          j.selected = !j.scoreResult.alreadyApplied && !j.scoreResult.blacklisted && j.scoreResult.score >= minScore;
+        }
+        renderWidget();
+      });
+    }
+
+    const jobsAll = shadowRoot.getElementById('la-jobs-select-all');
+    if (jobsAll) {
+      jobsAll.addEventListener('click', () => {
+        for (const j of widgetState.discoveredJobs) {
+          if (!j.scoreResult.blacklisted) j.selected = true;
+        }
+        renderWidget();
+      });
+    }
+
+    const jobsNone = shadowRoot.getElementById('la-jobs-select-none');
+    if (jobsNone) {
+      jobsNone.addEventListener('click', () => {
+        for (const j of widgetState.discoveredJobs) {
+          j.selected = false;
         }
         renderWidget();
       });

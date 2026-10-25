@@ -17,7 +17,8 @@
     </div>
     <div class="topbar-actions">
       <span class="storage-pill" id="storage-usage">Storage: 0 KB</span>
-      <a href="../test-pages/ats-sandbox.html" target="_blank" class="btn btn-outline">🧪 Open Multi-ATS Sandbox</a>
+      <a href="../test-pages/linkedin-easy-apply-sandbox.html" target="_blank" class="btn btn-outline">🟦 LinkedIn Auto-Apply Sandbox</a>
+      <a href="../test-pages/ats-sandbox.html" target="_blank" class="btn btn-outline">🧪 Multi-ATS Sandbox</a>
       <button class="btn btn-outline" id="btn-load-demo">✨ Load Demo Profile</button>
       <button class="btn btn-primary" id="btn-save-all">💾 Save All Changes</button>
     </div>
@@ -28,7 +29,9 @@
   <main class="layout">
     <aside class="sidebar">
       <nav class="nav-list">
-        <button class="nav-btn active" data-tab="tab-profile">👤 Profile & Contact</button>
+        <button class="nav-btn active" data-tab="tab-autoapply">🚀 Resume Auto-Applier</button>
+        <button class="nav-btn" data-tab="tab-tracker">📊 Applied Jobs Tracker <span class="nav-count" id="applied-count-badge">0</span></button>
+        <button class="nav-btn" data-tab="tab-profile">👤 Profile & Contact</button>
         <button class="nav-btn" data-tab="tab-experience">💼 Work Experience</button>
         <button class="nav-btn" data-tab="tab-education">🎓 Education</button>
         <button class="nav-btn" data-tab="tab-workauth">🛂 Work Auth & EEO</button>
@@ -53,8 +56,116 @@
     </aside>
 
     <section class="content-area">
+      <!-- TAB 0: RESUME-TO-JOBS AUTO-APPLIER -->
+      <div class="tab-panel active" id="tab-autoapply">
+        <div class="panel-header">
+          <div>
+            <h2>🚀 Resume-to-Jobs Scanner & Multi-Platform Auto-Applier</h2>
+            <p>Upload or paste your resume to extract your skills & target roles 100% locally, score job feeds in real time, and apply across LinkedIn, Indeed, Glassdoor, Wellfound, BuiltIn, Dice, ZipRecruiter & direct ATS portals.</p>
+          </div>
+          <a href="../test-pages/linkedin-easy-apply-sandbox.html" target="_blank" class="btn btn-primary">🧪 Test LinkedIn Auto-Apply Simulator</a>
+        </div>
+
+        <div class="settings-card" style="margin-bottom:18px;">
+          <h3>Step 1: Parse Your Resume Locally (PDF, DOCX, TXT, or Paste Text)</h3>
+          <p style="font-size:12px;color:#64748b;margin-bottom:10px;">
+            Extracts your skills, role titles, years of experience, and contact info directly inside your browser—nothing ever leaves your computer.
+          </p>
+          <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
+            <label class="btn btn-outline" style="cursor:pointer;">
+              📄 Upload Resume File to Parse (.pdf, .txt, .md)
+              <input type="file" id="autoapply-resume-upload" accept=".pdf,.txt,.md,.doc,.docx" style="display:none;" />
+            </label>
+            <button class="btn btn-primary" id="btn-parse-resume-text">🧠 Parse Resume Text & Sync to Profile</button>
+            <span id="parse-status-badge" style="font-size:12px;color:#059669;font-weight:600;"></span>
+          </div>
+          <div class="field">
+            <label>Resume Raw Text (Paste your resume here or upload a file above)</label>
+            <textarea id="autoapply-raw-resume" rows="5" placeholder="Paste your full resume text here (or click '✨ Load Demo Profile' in the top bar) to automatically extract skills, titles, years of experience, and contact info..."></textarea>
+          </div>
+        </div>
+
+        <div class="settings-card" style="margin-bottom:18px;">
+          <h3>Step 2: Execution Mode, Match Threshold & Blacklist Filters</h3>
+          <div class="radio-card-list" style="margin-bottom:14px;">
+            <label class="radio-card">
+              <input type="radio" name="autoApplyExecMode" value="semi_auto" />
+              <div>
+                <strong>Mode 1: Select & Review Queue (Pause Before Final Submit)</strong>
+                <p>Scans and scores all jobs on the page, lets you check/uncheck which jobs to apply to, autofills every step (Contact, Resume, Work Auth, Custom Questions), and pauses right at the final Submit button for your review.</p>
+              </div>
+            </label>
+            <label class="radio-card">
+              <input type="radio" name="autoApplyExecMode" value="full_auto" />
+              <div>
+                <strong>Mode 2: Full Auto-Apply Loop (Auto-Step & Submit Matching Jobs)</strong>
+                <p>Automatically iterates through all checked jobs above your Match % threshold, fills all multi-step modal screens, clicks Submit, logs the job in your Local Applied Tracker, and moves to the next job with human-like pacing.</p>
+              </div>
+            </label>
+          </div>
+
+          <div class="form-grid">
+            <div class="field">
+              <label>Minimum Resume Match Score Threshold: <span id="dash-min-score-label" style="color:#059669;font-weight:700;">65%</span></label>
+              <input type="range" id="dash-min-score-slider" min="20" max="95" step="5" value="65" style="accent-color:#10b981;" />
+            </div>
+            <div class="field">
+              <label>Pacing Delay Between Steps (ms)</label>
+              <input type="number" id="dash-step-delay" value="900" min="300" max="10000" step="100" />
+            </div>
+            <div class="field full-width">
+              <label>Target Job Titles (Comma-separated — extracted from your resume)</label>
+              <input type="text" id="dash-target-roles" placeholder="Senior Software Engineer, Full Stack Engineer, Backend Engineer, Distributed Systems Engineer" />
+            </div>
+            <div class="field full-width">
+              <label>Matched Candidate Skills (Comma-separated — extracted from your resume)</label>
+              <input type="text" id="dash-target-skills" placeholder="TypeScript, JavaScript, React, Node.js, Go, Python, PostgreSQL, AWS, Docker, Kubernetes" />
+            </div>
+            <div class="field">
+              <label>Preferred Locations (Comma-separated)</label>
+              <input type="text" id="dash-preferred-locations" placeholder="Remote, San Francisco, New York" />
+            </div>
+            <div class="field">
+              <label>Max Applications Per Batch Run</label>
+              <input type="number" id="dash-max-apps" value="25" min="1" max="100" />
+            </div>
+            <div class="field">
+              <label>Excluded / Blacklisted Companies (Never apply)</label>
+              <input type="text" id="dash-blacklist-companies" placeholder="Current Employer Inc, SpamStaffing LLC" />
+            </div>
+            <div class="field">
+              <label>Excluded Title/Description Keywords (Never apply)</label>
+              <input type="text" id="dash-blacklist-keywords" placeholder="Unpaid, Commission Only, Active TS/SCI" />
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-card">
+          <h3>Step 3: Launch Personalized Job Searches Across Platforms</h3>
+          <p style="font-size:12px;color:#64748b;margin-bottom:12px;">
+            Click any platform below to open a job search pre-filtered by your resume's top role, skills, and location. Once the page loads, use the floating <b>LocalApply → 🚀 Auto-Apply</b> widget in the bottom-right corner!
+          </p>
+          <div id="platform-launch-grid" class="form-grid"></div>
+        </div>
+      </div>
+
+      <!-- TAB 0B: APPLIED JOBS TRACKER -->
+      <div class="tab-panel" id="tab-tracker">
+        <div class="panel-header">
+          <div>
+            <h2>📊 Local Applied Jobs History & Duplicate Prevention Tracker</h2>
+            <p>Every job you apply to is logged here locally so LocalApply automatically skips duplicate applications in future runs.</p>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-outline btn-sm" id="btn-export-applied-csv">⬇️ Export CSV</button>
+            <button class="btn btn-danger btn-sm" id="btn-clear-applied">🗑️ Clear History</button>
+          </div>
+        </div>
+        <div id="applied-jobs-list" class="repeater-list"></div>
+      </div>
+
       <!-- TAB 1: PROFILE & CONTACT -->
-      <div class="tab-panel active" id="tab-profile">
+      <div class="tab-panel" id="tab-profile">
         <div class="panel-header">
           <div>
             <h2>Profile & Contact Information</h2>
@@ -335,6 +446,7 @@
 
   <script src="../src/storage.js"></script>
   <script src="../src/matcher.js"></script>
+  <script src="../src/resume-parser.js"></script>
   <script src="dashboard.js"></script>
 </body>
 </html>

@@ -94,6 +94,31 @@
       files: {
         resume: null,
         coverLetter: null
+      },
+      autoApply: {
+        parsedResume: {
+          rawText: '',
+          extractedTitles: [],
+          extractedSkills: [],
+          yearsOfExperience: '',
+          lastParsedAt: null
+        },
+        preferences: {
+          // 'semi_auto' = Select & Review Queue (autofills steps & pauses before final submit)
+          // 'full_auto' = Full Auto-Apply Loop (autofills all steps & submits matching jobs automatically)
+          executionMode: 'semi_auto',
+          minMatchScore: 65,
+          targetRoles: ['Software Engineer', 'Full Stack Engineer', 'Backend Engineer'],
+          targetSkills: ['JavaScript', 'TypeScript', 'React', 'Node.js', 'Python', 'SQL', 'AWS'],
+          preferredLocations: ['Remote', 'San Francisco', 'New York'],
+          remoteOnly: false,
+          easyApplyOnly: false,
+          blacklistedCompanies: [],
+          blacklistedKeywords: ['Unpaid', 'Commission Only'],
+          stepDelayMs: 900,
+          maxApplicationsPerRun: 25
+        },
+        appliedJobs: []
       }
     };
   }
@@ -249,6 +274,44 @@
     async clearAllData() {
       const defaults = getDefaultSchema();
       return this.saveData(defaults);
+    },
+
+    async recordAppliedJob(jobEntry) {
+      const data = await this.getData();
+      if (!data.autoApply) data.autoApply = getDefaultSchema().autoApply;
+      if (!Array.isArray(data.autoApply.appliedJobs)) {
+        data.autoApply.appliedJobs = [];
+      }
+
+      const normTitle = (jobEntry.title || '').toLowerCase().trim();
+      const normCompany = (jobEntry.company || '').toLowerCase().trim();
+
+      const existingIdx = data.autoApply.appliedJobs.findIndex(
+        (j) =>
+          (jobEntry.jobId && j.jobId === jobEntry.jobId) ||
+          (normTitle && normCompany && (j.title || '').toLowerCase().trim() === normTitle && (j.company || '').toLowerCase().trim() === normCompany)
+      );
+
+      const record = {
+        id: 'app_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+        jobId: jobEntry.jobId || '',
+        title: jobEntry.title || 'Untitled Role',
+        company: jobEntry.company || 'Unknown Company',
+        location: jobEntry.location || '',
+        platform: jobEntry.platform || 'LinkedIn',
+        matchScore: jobEntry.matchScore || 0,
+        status: jobEntry.status || 'Applied',
+        url: jobEntry.url || (typeof window !== 'undefined' && window.location ? window.location.href : ''),
+        appliedAt: Date.now()
+      };
+
+      if (existingIdx >= 0) {
+        data.autoApply.appliedJobs[existingIdx] = Object.assign({}, data.autoApply.appliedJobs[existingIdx], record);
+      } else {
+        data.autoApply.appliedJobs.unshift(record);
+      }
+
+      return this.saveData(data);
     },
 
     dataUrlToFile(fileObj) {
