@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "LocalApply — 100% Local Job Application Autofill",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "description": "Strictly local job application autofill & answer memory for Workday, Greenhouse, Ashby, Eightfold, Lever, and all career portals. Zero cloud servers.",
   "permissions": [
     "storage",
