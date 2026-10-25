@@ -52,6 +52,7 @@
       mountFloatingWidget();
       await refreshScan();
       attachAutoCaptureListeners();
+      attachJobFeedWatchers();
     }
 
     if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
@@ -203,6 +204,33 @@
 
     document.addEventListener('change', handleFieldChange, true);
     document.addEventListener('blur', handleFieldChange, true);
+  }
+
+  function attachJobFeedWatchers() {
+    window.addEventListener('localapply:jobs-updated', () => {
+      refreshScan();
+    });
+
+    if (!widgetState.jobBoard.isJobBoard) return;
+    let debounceTimer = null;
+    const observer = new MutationObserver((mutations) => {
+      // Ignore mutations caused by our own badge or widget
+      const hasExternalChange = mutations.some((m) => {
+        if (!m.target || m.target.id === 'localapply-host-root') return false;
+        if (m.target.classList && m.target.classList.contains('localapply-job-match-badge')) return false;
+        return m.addedNodes && m.addedNodes.length > 0;
+      });
+      if (!hasExternalChange) return;
+
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        refreshScan();
+      }, 650);
+    });
+
+    if (document.body) {
+      observer.observe(document.body, { childList: true, subtree: true });
+    }
   }
 
   async function executeAutofillSelected() {

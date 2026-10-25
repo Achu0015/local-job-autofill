@@ -52,9 +52,13 @@
     const board = detectJobBoard(doc, window.location);
 
     const cardSelectors = [
-      '[data-job-card]',                                   // Sandbox & Universal attribute
+      '[data-job-card]',                                   // Live Job Explorer & Universal attribute
+      '[data-entity-urn*="jobPosting"]',                   // LinkedIn Guest & Search Card URN
       'li[data-occludable-job-id]',                        // LinkedIn Search Feed
+      'li.scaffold-layout__list-item',                     // LinkedIn Logged-In 2-Pane Feed
+      '[data-view-name="job-card"]',                       // LinkedIn 2025/2026 SDUI Card
       '.job-card-container',                               // LinkedIn Job Card
+      '.base-search-card',                                 // LinkedIn Public Search Card
       '.jobs-search-results__list-item',                   // LinkedIn List Item
       '.job_seen_beacon',                                  // Indeed Job Card
       '[data-test="jobListing"]',                          // Glassdoor Job Card
@@ -73,8 +77,11 @@
     const seenIds = new Set();
 
     cardElements.forEach((cardEl, index) => {
+      const urn = cardEl.getAttribute('data-entity-urn') || '';
+      const urnId = urn.includes('jobPosting:') ? 'li_' + urn.split('jobPosting:')[1] : '';
       const jobId =
         cardEl.getAttribute('data-job-id') ||
+        urnId ||
         cardEl.getAttribute('data-occludable-job-id') ||
         cardEl.getAttribute('data-jk') ||
         cardEl.id ||
@@ -84,13 +91,13 @@
       seenIds.add(jobId);
 
       const titleEl = cardEl.querySelector(
-        '[data-job-title], .job-card-list__title, .job-card-container__link, .jobTitle, [data-test="job-title"], h2, h3, a strong'
+        '[data-job-title], .base-search-card__title, .job-card-list__title, .job-card-container__link, .jobTitle, [data-test="job-title"], h2, h3, a strong'
       );
       const companyEl = cardEl.querySelector(
-        '[data-job-company], .job-card-container__primary-description, .artdeco-entity-lockup__subtitle, [data-testid="company-name"], .companyName, [data-test="employer-name"]'
+        '[data-job-company], .base-search-card__subtitle, .job-card-container__primary-description, .artdeco-entity-lockup__subtitle, [data-testid="company-name"], .companyName, [data-test="employer-name"]'
       );
       const locationEl = cardEl.querySelector(
-        '[data-job-location], .job-card-container__metadata-item, .artdeco-entity-lockup__caption, [data-testid="text-location"], .companyLocation, [data-test="emp-location"]'
+        '[data-job-location], .job-search-card__location, .job-card-container__metadata-item, .artdeco-entity-lockup__caption, [data-testid="text-location"], .companyLocation, [data-test="emp-location"]'
       );
       const descEl = cardEl.querySelector(
         '[data-job-snippet], .job-card-list__footer-wrapper, .job-snippet, p'
@@ -129,7 +136,7 @@
         description,
         isEasyApply,
         url,
-        platform: board.name,
+        platform: cardEl.getAttribute('data-platform') || board.name,
         cardElement: cardEl
       };
 
